@@ -22,13 +22,19 @@ data/
   cache/       local cache for WHOIS/DNS/SSL lookups (gitignored)
 src/
   data_collection/
-    fetch_feeds.py         download OpenPhish, PhishTank, Majestic Million
-    build_dataset.py       combine feeds into data/processed/dataset.csv
-    build_host_features.py run host telemetry over the dataset -> host_features.csv
+    fetch_feeds.py            download OpenPhish, PhishTank, Majestic Million
+    build_dataset.py          combine feeds into data/processed/dataset.csv
+    build_lexical_features.py lexical features over the full dataset -> lexical_features.csv
+    build_host_features.py    host telemetry over a sample -> host_features.csv
+    build_hybrid_features.py  lexical + host telemetry over a sample -> hybrid_features.csv
   features/
     lexical.py         URL length, entropy, keyword vectors, etc.
     host_telemetry.py  DNS/WHOIS/SSL/HTTP header lookups, cached per-host
-  models/        baseline + XGBoost/RF ensemble training, evaluation
+  models/
+    features.py      shared DataFrame -> (X, y) matrix builder
+    evaluate.py       10-fold CV, SMOTE/class-weight imbalance handling, hyperparameter tuning
+    train_baseline.py Decision Tree / Logistic Regression / Random Forest on lexical features
+    train_ensemble.py tuned XGBoost + Random Forest soft-voting ensemble on hybrid features
   utils/         shared helpers (e.g. local caching)
 notebooks/       exploratory analysis, SHAP plots
 tests/
@@ -65,3 +71,34 @@ Concurrency is capped at 50 in-flight requests (`CONCURRENCY` in
 full ~126k-row dataset will still take a long time and risks WHOIS IP
 throttling, so start with a sample (a few hundred to a few thousand rows) for
 model development and only scale up once the pipeline is stable.
+
+XGBoost requires the OpenMP runtime, which isn't bundled on macOS:
+
+```bash
+brew install libomp
+```
+
+## Week 3 — baseline models
+
+```bash
+python -m src.data_collection.build_lexical_features   # writes lexical_features.csv (full dataset, no network calls)
+python -m src.models.train_baseline                    # Decision Tree, Logistic Regression, Random Forest, 10-fold CV
+```
+
+Writes `data/processed/baseline_results.csv`.
+
+## Week 4-5 — hybrid ensemble, tuning, and CV
+
+```bash
+python -m src.data_collection.build_hybrid_features 1500   # lexical + host telemetry for a sample of 1500 URLs
+python -m src.models.train_ensemble                         # tunes XGBoost, builds the weighted XGBoost+RF ensemble
+```
+
+`train_ensemble.py` hyperparameter-tunes XGBoost with `RandomizedSearchCV`
+(optimizing precision, per the proposal's priority of minimizing false
+positives), builds a 2:1-weighted soft-voting ensemble with a Random Forest,
+and evaluates it with 10-fold CV alongside lexical-only and host-only
+Random Forest baselines on the same rows, so the hybrid gain is measured on
+a like-for-like sample. Pass `use_smote=True` in `run()` (or wire up a CLI
+flag) to compare SMOTE against the default class-weighting for imbalance.
+Writes `data/processed/ensemble_results.csv`.
