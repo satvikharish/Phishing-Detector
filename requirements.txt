@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+xgboost
+imbalanced-learn
+shap
+aiohttp
+dnspython
+python-whois
+tldextract
+requests
+python-dotenv
+matplotlib
+tqdm
+pytest
