@@ -102,3 +102,21 @@ Random Forest baselines on the same rows, so the hybrid gain is measured on
 a like-for-like sample. Pass `use_smote=True` in `run()` (or wire up a CLI
 flag) to compare SMOTE against the default class-weighting for imbalance.
 Writes `data/processed/ensemble_results.csv`.
+
+## Week 6 — SHAP analysis and latency trade-offs
+
+```bash
+python -m src.models.shap_analysis                 # writes reports/figures/shap_summary.png, shap_importance_bar.png
+python -m src.models.latency_analysis 50            # writes reports/figures/latency_comparison.png
+```
+
+`shap_analysis.py` explains the tuned XGBoost component of the ensemble
+(it's the 2x-weighted, dominant vote) with `shap.TreeExplainer`, over the
+same `hybrid_features.csv` sample used for ensemble training.
+
+`latency_analysis.py` times lexical vs. host-telemetry extraction per URL
+and plots the comparison on a log scale, for the proposal's "extraction
+latency trade-offs" discussion point. On a 20-URL sample this measured
+~1.4ms (lexical) vs. ~1000ms (host telemetry) — a ~700x difference driven
+by WHOIS/DNS network round-trips, worth calling out directly in the
+Limitations/Discussion sections.
